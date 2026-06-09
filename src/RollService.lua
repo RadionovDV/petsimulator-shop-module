@@ -35,8 +35,13 @@ end
 function RollService.Roll(player)
 	PlayerService.WaitForLoad(player)
 
+	local donateUpgrades = PlayerService.GetValue(player, "donateUpgrades") or {}
+
 	local now = os.clock()
 	local cooldown = PlayerService.GetValue(player, "rollCooldown") or 2
+	if donateUpgrades.fastRoll then
+		cooldown = cooldown / 2
+	end
 
 	if lastRollTime[player.UserId] and (now - lastRollTime[player.UserId]) < cooldown then
 		return
@@ -46,6 +51,9 @@ function RollService.Roll(player)
 	local luck = PlayerService.GetValue(player, "luck") or 1
 	local rebirthLuck = PlayerService.GetValue(player, "rebirthBonusLuck") or 0
 	local effectiveLuck = luck + rebirthLuck
+	if donateUpgrades.luckyRoll then
+		effectiveLuck = effectiveLuck * 2
+	end
 	if GameConfig.superLuck then
 		effectiveLuck = 1000000000
 	end
@@ -86,6 +94,9 @@ function RollService.Roll(player)
 	-- Auto-equip if slot available
 	local equipped = PlayerService.GetValue(player, "equippedPets") or {}
 	local maxSlots = PlayerService.GetValue(player, "maxEquipSlots") or 1
+	if donateUpgrades.extraSlot then
+		maxSlots = maxSlots + 1
+	end
 	
 	local autoEquipped = false
 	

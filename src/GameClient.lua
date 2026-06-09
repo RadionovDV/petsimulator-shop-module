@@ -22,6 +22,7 @@ local OfflineIncomeController = require(module.OfflineIncomeController)
 local DailyRewardController = require(module.DailyRewardController)
 local MicroRewardController = require(module.MicroRewardController)
 local TutorialController = require(module.TutorialController)
+local ShopController = require(module.ShopController)
 local GameConfig = require(ReplicatedFirst.GameConfig)
 
 PlayerDataClient.start()
@@ -42,6 +43,7 @@ local GameClient = {
 		OfflineIncomeController = OfflineIncomeController,
 		DailyRewardController = DailyRewardController,
 		MicroRewardController = MicroRewardController,
+		ShopController = ShopController,
 	},
 }
 
@@ -82,6 +84,12 @@ PlayerDataClient.updated:Connect(function(valueName, value)
 		RollController.UpdateAutoRollVisibility()
 	elseif valueName == "dailyRewardDay" or valueName == "dailyRewardClaimed" then
 		UpgradeController.UpdateNotifications()
+	elseif valueName == "donateUpgrades" then
+		ShopController.Refresh()
+		UpgradeController.UpdateNotifications()
+		RollController.UpdateAutoRollVisibility()
+	elseif valueName == "starterPackClaimed" then
+		ShopController.Refresh()
 	end
 end)
 
@@ -111,6 +119,7 @@ LocationController.UpdateGateStates()
 RebirthController.Refresh()
 VisibilityController.Refresh()
 RollController.UpdateAutoRollVisibility()
+ShopController.Init()
 
 -- Start controllers that need event listeners
 OfflineIncomeController.Start()

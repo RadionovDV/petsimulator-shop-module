@@ -1,0 +1,224 @@
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+
+
+local PlayerDataClient = require(ReplicatedStorage.PlayerData.PlayerDataClient)
+local ShopConfig = require(ReplicatedFirst.ShopConfig)
+
+local player = Players.LocalPlayer
+local playerGui = player.PlayerGui
+local menuGui = playerGui:WaitForChild("MenuGui")
+
+local Remotes = ReplicatedStorage.Remotes
+
+local ShopController = {}
+
+local limitedPackQuantity = ShopConfig.LimitedPack.initialQuantity
+
+local shopFrame = menuGui:WaitForChild("Shop")
+local topBar = shopFrame:WaitForChild("TopBar")
+local closeButton = topBar:WaitForChild("Frame"):WaitForChild("CloseButton")
+
+local body = shopFrame:WaitForChild("Body")
+local scrollingBody = body:WaitForChild("ScrollingBody")
+local passesGrid = scrollingBody:WaitForChild("PassesGrid")
+local coinsGrid = scrollingBody:WaitForChild("CoinsGrid")
+
+local starterPack = scrollingBody:WaitForChild("StarterPackBoard")
+local starterPackBody = starterPack:WaitForChild("Body")
+local starterPackTitel = starterPackBody:WaitForChild("Titel")
+local starterTimer = starterPackTitel:WaitForChild("ExpireLabel")
+local starterBoardContent = starterPackBody:WaitForChild("BoardContent")
+local starterActions = starterBoardContent:WaitForChild("Actions")
+local starterPurchaseBtn = starterActions:WaitForChild("PurchaseButton")
+local starterPriceFrame = starterPurchaseBtn:WaitForChild("Price")
+local starterPriceLabel = starterPriceFrame:WaitForChild("PriceLabel")
+local starterOldPriceFrame = starterActions:WaitForChild("OldPrice")
+local starterOldPriceInner = starterOldPriceFrame:WaitForChild("Price")
+local starterOldPriceLabel = starterOldPriceInner:WaitForChild("PriceLabel")
+
+local limitedPackFrame = scrollingBody:WaitForChild("LimitedPackFrame")
+local limitedPack = limitedPackFrame:WaitForChild("StarterPackBoard")
+local limitedPackBody = limitedPack:WaitForChild("Body")
+local limitedPackTitel = limitedPackBody:WaitForChild("Titel")
+local limitedRemains = limitedPackTitel:WaitForChild("RemainsLabel")
+local limitedBoardContent = limitedPackBody:WaitForChild("BoardContent")
+local limitedActions = limitedBoardContent:WaitForChild("Actions")
+local limitedPurchaseBtn = limitedActions:WaitForChild("PurchaseButton")
+local limitedPriceFrame = limitedPurchaseBtn:WaitForChild("Price")
+local limitedPriceLabel = limitedPriceFrame:WaitForChild("PriceLabel")
+
+local passesGridFrame = passesGrid:WaitForChild("GridFrame")
+local passesRow = passesGridFrame:WaitForChild("TilesRow")
+local fastRollPass = passesRow:WaitForChild("FastRollPass")
+local extraSlotPass = passesRow:WaitForChild("ExtraSlotPass")
+local luckyRollPass = passesRow:WaitForChild("LuckyRollPass")
+
+local coinsGridFrame = coinsGrid:WaitForChild("GridFrame")
+local coinsRow1 = coinsGridFrame:WaitForChild("TilesRow1")
+local coinsRow2 = coinsGridFrame:WaitForChild("TilesRow2")
+
+local function _findCoinsTile(coinsRow, col)
+	local name = "Coins" .. col
+	return coinsRow:WaitForChild(name)
+end
+
+local function _findPriceLabel(tile)
+	local priceLabel = tile:FindFirstChild("PriceLabel", true)
+	if not priceLabel then
+		warn(`Not find PriceLabel {tile}`)
+		return nil
+	end
+	return priceLabel
+end
+
+local function _formatTime(seconds)
+	local h = math.floor(seconds / 3600)
+	local m = math.floor((seconds % 3600) / 60)
+	return string.format("%02d:%02d", h, m)
+end
+
+function ShopController.Init()
+	starterPriceLabel.Text = tostring(ShopConfig.StarterPack.discountPrice)
+	starterOldPriceLabel.Text = tostring(ShopConfig.StarterPack.originalPrice)
+	limitedPriceLabel.Text = tostring(ShopConfig.LimitedPack.price)
+
+	for _, passConfig in pairs(ShopConfig.GamePasses) do
+		local frame = ShopController._getPassFrame(passConfig.perkId)
+		if frame then
+			local priceLabel = _findPriceLabel(frame)
+			priceLabel.Text = tostring(passConfig.priceRobux)
+		end
+	end
+
+	for _, coinConfig in ipairs(ShopConfig.Coins) do
+		local row = coinConfig.row == 1 and coinsRow1 or coinsRow2
+		local tile = _findCoinsTile(row, coinConfig.col)
+		local priceLabel = _findPriceLabel(tile)
+		priceLabel.Text = tostring(coinConfig.priceRobux)
+	end
+
+	closeButton.Activated:Connect(function()
+		shopFrame.Visible = false
+	end)
+
+	starterPurchaseBtn.Activated:Connect(function()
+		MarketplaceService:PromptProductPurchase(player, ShopConfig.StarterPack.productId)
+	end)
+
+	limitedPurchaseBtn.Activated:Connect(function()
+		MarketplaceService:PromptProductPurchase(player, ShopConfig.LimitedPack.productId)
+	end)
+
+	for _, passConfig in pairs(ShopConfig.GamePasses) do
+		local frame = ShopController._getPassFrame(passConfig.perkId)
+		local purchaseButton = frame:FindFirstChild("PurchaseButton", true)
+		if not purchaseButton then
+			warn(`Is not finding purchaseButton in {frame}`)
+			continue
+		end
+		purchaseButton.Activated:Connect(function()
+			MarketplaceService:PromptGamePassPurchase(player, passConfig.productId)
+		end)
+	end
+
+	for _, coinConfig in ipairs(ShopConfig.Coins) do
+		local row = coinConfig.row == 1 and coinsRow1 or coinsRow2
+		local tile = _findCoinsTile(row, coinConfig.col)
+		
+		local purchaseButton = tile:FindFirstChild("PurchaseButton", true)
+		if not purchaseButton then
+			warn(`Is not finding purchaseButton in {tile}`)
+			continue
+		end
+		purchaseButton.Activated:Connect(function()
+			print(coinConfig.productId)
+			MarketplaceService:PromptProductPurchase(player, coinConfig.productId)
+		end)
+	end
+
+	ShopController._startStarterTimer()
+
+	ShopController.Refresh()
+
+	Remotes.ShopUpdateLimitedQty.OnClientEvent:Connect(function(qty)
+		ShopController.UpdateLimitedQty(qty)
+	end)
+end
+
+function ShopController._getPassFrame(perkId)
+	if perkId == "fastRoll" then
+		return fastRollPass
+	elseif perkId == "extraSlot" then
+		return extraSlotPass
+	elseif perkId == "luckyRoll" then
+		return luckyRollPass
+	end
+	return nil
+end
+
+function ShopController._startStarterTimer()
+	task.spawn(function()
+		while true do
+			local firstJoinTime = PlayerDataClient.get("firstJoinTime") or 0
+			local claimed = PlayerDataClient.get("starterPackClaimed") or false
+
+			if claimed then
+				starterPack.Visible = false
+				--starterTimer.Text = "Claimed"
+				--starterPurchaseBtn.Visible = false
+				--starterOldPriceFrame.Visible = false
+				return
+			end
+
+			if firstJoinTime == 0 then
+				task.wait(1)
+				continue
+			end
+
+			local elapsed = os.time() - firstJoinTime
+			local maxSeconds = ShopConfig.StarterPack.validityHours * 3600
+			local remaining = maxSeconds - elapsed
+
+			if remaining <= 0 then
+				starterTimer.Text = "Expired"
+				starterPurchaseBtn.Visible = false
+				starterOldPriceFrame.Visible = false
+				return
+			end
+
+			starterTimer.Text = _formatTime(remaining)
+			task.wait(1)
+		end
+	end)
+end
+
+function ShopController.UpdateLimitedQty(qty)
+	limitedPackQuantity = qty
+	limitedRemains.Text = string.format("%d/%d", qty, ShopConfig.LimitedPack.initialQuantity)
+	if qty <= 0 then
+		limitedPurchaseBtn.Visible = false
+	else
+		limitedPurchaseBtn.Visible = true
+	end
+end
+
+function ShopController.Refresh()
+	local donateUpgrades = PlayerDataClient.get("donateUpgrades") or {}
+
+	for _, passConfig in pairs(ShopConfig.GamePasses) do
+		local frame = ShopController._getPassFrame(passConfig.perkId)
+		if frame then
+			local owned = donateUpgrades[passConfig.perkId]
+			if owned then
+				frame.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
+			else
+				frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			end
+		end
+	end
+end
+
+return ShopController

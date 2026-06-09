@@ -16,6 +16,10 @@ function PetEquipService.Equip(player, petId)
 	local pets = PlayerService.GetValue(player, "pets") or {}
 	local equipped = PlayerService.GetValue(player, "equippedPets") or {}
 	local maxSlots = PlayerService.GetValue(player, "maxEquipSlots") or 1
+	local donateUpgrades = PlayerService.GetValue(player, "donateUpgrades") or {}
+	if donateUpgrades.extraSlot then
+		maxSlots = maxSlots + 1
+	end
 
 	-- Must own the pet
 	if not pets[petId] then

@@ -43,6 +43,10 @@ local DEFAULT_DATA = {
 	offlineIncomeWarned = 0,
 	questProgress = { stage = 1, parts = {0, 0, 0} },
 	tutorialProgress = {},
+	firstJoinTime = 0,
+	starterPackClaimed = false,
+	donateUpgrades = {},
+	purchaseHistory = {},
 }
 
 if GameConfig.isCheat then
@@ -57,13 +61,13 @@ PlayerService.DEFAULT_DATA = DEFAULT_DATA
 PlayerService.PlayerReady = Signal.new()
 
 function PlayerService.Start()
-	PlayerDataServer.start(DEFAULT_DATA)
+	PlayerDataServer.start(DEFAULT_DATA, nil, {"purchaseHistory"})
 
 	-- Handle existing players already in the server
 	for _, player in Players:GetPlayers() do
 		task.spawn(function()
 			PlayerDataServer.waitForDataLoadAsync(player)
-			PlayerService.PlayerReady:Fire(player)
+			PlayerService._onPlayerReady(player)
 		end)
 	end
 
@@ -71,7 +75,7 @@ function PlayerService.Start()
 	Players.PlayerAdded:Connect(function(player)
 		task.spawn(function()
 			PlayerDataServer.waitForDataLoadAsync(player)
-			PlayerService.PlayerReady:Fire(player)
+			PlayerService._onPlayerReady(player)
 		end)
 	end)
 
@@ -92,6 +96,16 @@ function PlayerService.WaitForLoad(player)
 	if not PlayerDataServer.hasLoaded(player) then
 		PlayerDataServer.waitForDataLoadAsync(player)
 	end
+end
+
+function PlayerService._onPlayerReady(player)
+	local firstJoinTime = PlayerService.GetValue(player, "firstJoinTime")
+	if firstJoinTime == 0 then
+		PlayerService.UpdateValue(player, "firstJoinTime", function()
+			return os.time()
+		end)
+	end
+	PlayerService.PlayerReady:Fire(player)
 end
 
 return PlayerService
