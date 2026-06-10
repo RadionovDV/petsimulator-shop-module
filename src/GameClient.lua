@@ -90,6 +90,8 @@ PlayerDataClient.updated:Connect(function(valueName, value)
 		RollController.UpdateAutoRollVisibility()
 	elseif valueName == "starterPackClaimed" then
 		ShopController.Refresh()
+	elseif valueName == "luckBoostExpiry" or valueName == "speedBoostExpiry" then
+		EconomyController.UpdateDisplay()
 	end
 end)
 

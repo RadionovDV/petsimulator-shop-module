@@ -32,7 +32,11 @@ ShopConfig.GamePasses = {
 
 ShopConfig.StarterPack = {
 	productId = 3603653259,
-	coinsAmount = 5000,
+	coinsAmount = 30000,
+	rocksAmount = 0,
+	petType = "Rare_Boulder",
+	luckBoostDuration = 30 * 60,
+	speedBoostDuration = 15 * 60,
 	validityHours = 12,
 	discountPrice = 49,
 	originalPrice = 99,
@@ -40,11 +44,22 @@ ShopConfig.StarterPack = {
 
 ShopConfig.LimitedPack = {
 	productId = 3603653347,
-	coinsAmount = 10000,
+	coinsAmount = 1500000,
+	rocksAmount = 10000,
+	petType = "Legendary_Gem",
+	luckBoostDuration = 120 * 60,
+	speedBoostDuration = 60 * 60,
 	initialQuantity = 5000,
 	price = 399,
 	dataStoreName = "ShopGlobalData",
 	dataStoreKey = "LimitedPackQuantity",
+}
+
+ShopConfig.DailyGift = {
+	coinsAmount = 500,
+	rocksAmount = 50,
+	claimKey = "shopDailyGift",
+	cooldownSeconds = 24 * 3600,
 }
 
 return ShopConfig

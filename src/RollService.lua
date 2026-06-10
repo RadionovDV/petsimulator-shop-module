@@ -11,6 +11,7 @@ local RarityCalculator = require(ReplicatedStorage.RarityCalculator)
 local TableUtils = require(ReplicatedStorage.TableUtils)
 local GameConfig = require(ReplicatedFirst.GameConfig)
 local PetConfig = require(ReplicatedFirst.PetConfig)
+local PetUtils = require(script.Parent.PetUtils)
 
 local Remotes = ReplicatedStorage.Remotes
 
@@ -36,21 +37,32 @@ function RollService.Roll(player)
 	PlayerService.WaitForLoad(player)
 
 	local donateUpgrades = PlayerService.GetValue(player, "donateUpgrades") or {}
+	local timeNow = os.time()
+	local clockNow = os.clock()
+	local luckBoostExpiry = PlayerService.GetValue(player, "luckBoostExpiry") or 0
+	local speedBoostExpiry = PlayerService.GetValue(player, "speedBoostExpiry") or 0
+	local hasLuckBoost = luckBoostExpiry > timeNow
+	local hasSpeedBoost = speedBoostExpiry > timeNow
 
-	local now = os.clock()
 	local cooldown = PlayerService.GetValue(player, "rollCooldown") or 2
+	if hasSpeedBoost then
+		cooldown = cooldown / 2
+	end
 	if donateUpgrades.fastRoll then
 		cooldown = cooldown / 2
 	end
 
-	if lastRollTime[player.UserId] and (now - lastRollTime[player.UserId]) < cooldown then
+	if lastRollTime[player.UserId] and (clockNow - lastRollTime[player.UserId]) < cooldown then
 		return
 	end
-	lastRollTime[player.UserId] = now
+	lastRollTime[player.UserId] = clockNow
 
 	local luck = PlayerService.GetValue(player, "luck") or 1
 	local rebirthLuck = PlayerService.GetValue(player, "rebirthBonusLuck") or 0
 	local effectiveLuck = luck + rebirthLuck
+	if hasLuckBoost then
+		effectiveLuck = effectiveLuck * 2
+	end
 	if donateUpgrades.luckyRoll then
 		effectiveLuck = effectiveLuck * 2
 	end

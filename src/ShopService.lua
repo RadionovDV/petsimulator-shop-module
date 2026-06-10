@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local DataStoreService = game:GetService("DataStoreService")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
@@ -8,21 +9,11 @@ local PlayerService = require(script.Parent.PlayerService)
 local EconomyService = require(script.Parent.EconomyService)
 local ShopConfig = require(ReplicatedFirst.ShopConfig)
 local PlayerDataServer = require(ReplicatedStorage.PlayerData.PlayerDataServer)
+local PetUtils = require(script.Parent.PetUtils)
 
 local Remotes = ReplicatedStorage.Remotes
 
 local ShopService = {}
-
---local devReceiptInfo = {
---	["CurrencySpent"] = 0,
---	["CurrencyType"] = Enum.CurrencyType.Robux,
---	["PlaceIdWherePurchased"] = 129668456888642,
---	["PlayerId"] = 7450961616,
---	["ProductId"] = 3603653347,
---	["ProductPurchaseChannel"] = Enum.ProductPurchaseChannel.InExperience,
---	["PurchaseId"] = math.random(),
---	["ReceiptType"] = nil
---}
 
 local limitedPackStore = DataStoreService:GetDataStore(ShopConfig.LimitedPack.dataStoreName)
 local limitedPackQuantity = ShopConfig.LimitedPack.initialQuantity
@@ -32,9 +23,31 @@ function ShopService.StartListening()
 		return ShopService._processReceipt(receiptInfo)
 	end
 
+	Remotes.DevGamePassPurchase.OnServerEvent:Connect(function(player, productId)
+		if not RunService:IsStudio() then
+			return
+		end
+		local devReceiptInfo = {
+			CurrencySpent = 0,
+			CurrencyType = Enum.CurrencyType.Robux,
+			PlaceIdWherePurchased = 129668456888642,
+			PlayerId = player.UserId,
+			ProductId = productId,
+			ProductPurchaseChannel = Enum.ProductPurchaseChannel.InExperience,
+			PurchaseId = tostring(math.random()),
+		}
+		ShopService._processReceipt(devReceiptInfo)
+	end)
+
+	Remotes.ClaimDailyGift.OnServerEvent:Connect(function(player)
+		ShopService._claimDailyGift(player)
+	end)
+
 	PlayerService.PlayerReady:Connect(function(player)
 		ShopService._verifyDonateUpgrades(player)
 		ShopService._syncLimitedQtyToPlayer(player)
+		ShopService._syncBoostsToPlayer(player)
+		ShopService._syncDailyGiftState(player)
 	end)
 end
 
@@ -64,6 +77,63 @@ end
 
 function ShopService._syncLimitedQtyToPlayer(player)
 	Remotes.ShopUpdateLimitedQty:FireClient(player, limitedPackQuantity)
+end
+
+function ShopService._syncBoostsToPlayer(player)
+	local luckExpiry = PlayerService.GetValue(player, "luckBoostExpiry") or 0
+	local speedExpiry = PlayerService.GetValue(player, "speedBoostExpiry") or 0
+	Remotes.ShopSyncBoosts:FireClient(player, luckExpiry, speedExpiry)
+end
+
+function ShopService._syncDailyGiftState(player)
+	local lastClaim = PlayerService.GetValue(player, "shopDailyGift") or 0
+	local isAvailable = (os.time() - lastClaim) >= ShopConfig.DailyGift.cooldownSeconds
+	local nextAvailable = lastClaim + ShopConfig.DailyGift.cooldownSeconds
+	Remotes.ShopDailyGiftState:FireClient(player, isAvailable, nextAvailable)
+end
+
+function ShopService._claimDailyGift(player)
+	PlayerService.WaitForLoad(player)
+
+	local lastClaim = PlayerService.GetValue(player, "shopDailyGift") or 0
+	if os.time() - lastClaim < ShopConfig.DailyGift.cooldownSeconds then
+		return
+	end
+
+	EconomyService.AddCoins(player, ShopConfig.DailyGift.coinsAmount)
+	EconomyService.AddRocks(player, ShopConfig.DailyGift.rocksAmount)
+	PlayerService.UpdateValue(player, "shopDailyGift", function()
+		return os.time()
+	end)
+
+	local isAvailable = false
+	local nextAvailable = os.time() + ShopConfig.DailyGift.cooldownSeconds
+	Remotes.ShopDailyGiftState:FireClient(player, isAvailable, nextAvailable)
+end
+
+function ShopService._applyBoosts(player, packType)
+	local config = packType == "starterPack" and ShopConfig.StarterPack or ShopConfig.LimitedPack
+	local now = os.time()
+
+	if config.luckBoostDuration and config.luckBoostDuration > 0 then
+		PlayerService.UpdateValue(player, "luckBoostExpiry", function(old)
+			local current = old or 0
+			if current < now then
+				current = now
+			end
+			return current + config.luckBoostDuration
+		end)
+	end
+
+	if config.speedBoostDuration and config.speedBoostDuration > 0 then
+		PlayerService.UpdateValue(player, "speedBoostExpiry", function(old)
+			local current = old or 0
+			if current < now then
+				current = now
+			end
+			return current + config.speedBoostDuration
+		end)
+	end
 end
 
 function ShopService._processReceipt(receiptInfo)
@@ -112,6 +182,9 @@ function ShopService._processReceipt(receiptInfo)
 		end
 
 		EconomyService.AddCoins(player, ShopConfig.StarterPack.coinsAmount)
+		EconomyService.AddRocks(player, ShopConfig.StarterPack.rocksAmount)
+		PetUtils.GrantPet(player, ShopConfig.StarterPack.petType)
+		ShopService._applyBoosts(player, "starterPack")
 		PlayerService.UpdateValue(player, "starterPackClaimed", function()
 			return true
 		end)
@@ -132,6 +205,9 @@ function ShopService._processReceipt(receiptInfo)
 		end
 
 		EconomyService.AddCoins(player, ShopConfig.LimitedPack.coinsAmount)
+		EconomyService.AddRocks(player, ShopConfig.LimitedPack.rocksAmount)
+		PetUtils.GrantPet(player, ShopConfig.LimitedPack.petType)
+		ShopService._applyBoosts(player, "limitedPack")
 		limitedPackQuantity = newQty
 		Remotes.ShopUpdateLimitedQty:FireAllClients(newQty)
 		granted = true

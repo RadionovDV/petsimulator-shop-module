@@ -47,6 +47,9 @@ local DEFAULT_DATA = {
 	starterPackClaimed = false,
 	donateUpgrades = {},
 	purchaseHistory = {},
+	luckBoostExpiry = 0,
+	speedBoostExpiry = 0,
+	shopDailyGift = 0,
 }
 
 if GameConfig.isCheat then
