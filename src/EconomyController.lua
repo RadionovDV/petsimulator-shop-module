@@ -34,16 +34,47 @@ local speedBoostIcon = nil
 local boostThread = nil
 
 function EconomyController._getLuckSum()
+	if not PlayerDataClient.hasLoaded() then
+		PlayerDataClient.loaded:Wait()
+	end
 	local luck = PlayerDataClient.get("luck") or 0
 	local rebirthBonusLuck = PlayerDataClient.get("rebirthBonusLuck") or 0
-	return luck + rebirthBonusLuck
+	local totalLuck =  luck + rebirthBonusLuck
+	
+	local donateUpgrade = PlayerDataClient.get("donateUpgrades") or {}
+	
+	if donateUpgrade.luckyRoll then
+		totalLuck = totalLuck * 2
+	end
+	return totalLuck
+end
+
+function EconomyController._getSpeedSum()
+	if not PlayerDataClient.hasLoaded() then
+		PlayerDataClient.loaded:Wait()
+	end
+
+	local rollCooldown = PlayerDataClient.get("rollCooldown") or 0
+	local donateUpgrade = PlayerDataClient.get("donateUpgrades") or {}
+
+	if donateUpgrade.fastRoll then
+		rollCooldown = rollCooldown / 2
+	end
+	return rollCooldown
 end
 
 function EconomyController._getLuckBoostExpiry()
+	if not PlayerDataClient.hasLoaded() then
+		PlayerDataClient.loaded:Wait()
+	end
 	return PlayerDataClient.get("luckBoostExpiry") or 0
 end
 
 function EconomyController._getSpeedBoostExpiry()
+	if not PlayerDataClient.hasLoaded() then
+		PlayerDataClient.loaded:Wait()
+	end
+	
 	return PlayerDataClient.get("speedBoostExpiry") or 0
 end
 
@@ -55,7 +86,15 @@ function EconomyController.UpdateDisplay()
 	if luckBoostExpiry > os.time() then
 		luckSum = luckSum * 2
 	end
+	
 	multLuckLabel.Text = string.format("x%s", FormatNumber.Format(luckSum))
+	
+	local rollSum = EconomyController._getSpeedSum()
+	local speedBoostExpiry = EconomyController._getSpeedBoostExpiry()
+	if speedBoostExpiry > os.time() then
+		rollSum = rollSum / 2
+	end
+	speedDiceLabel.Text = `{rollSum} s`
 end
 
 function EconomyController.AnimateCoin(amount, screenPosition)
@@ -94,10 +133,10 @@ function EconomyController._updateBoostIcon(boostType)
 		icon.Name = boostType .. "BoostIcon"
 		icon.Parent = states
 		if boostType == "Luck" then
-			icon.IconLabel.Image = "rbxassetid://LUCK_BOOST_ICON"
+			icon.IconLabel.Image = "rbxassetid://83955876596707"
 			luckBoostIcon = icon
 		else
-			icon.IconLabel.Image = "rbxassetid://SPEED_BOOST_ICON"
+			icon.IconLabel.Image = "rbxassetid://122184010309818"
 			speedBoostIcon = icon
 		end
 	elseif not active and icon then

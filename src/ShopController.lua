@@ -6,6 +6,7 @@ local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
 local PlayerDataClient = require(ReplicatedStorage.PlayerData.PlayerDataClient)
 local ShopConfig = require(ReplicatedFirst.ShopConfig)
+local LoadingDisplay = require(ReplicatedStorage.UI.Components.LoadingDisplay)
 
 local player = Players.LocalPlayer
 local playerGui = player.PlayerGui
@@ -19,6 +20,7 @@ local limitedPackQuantity = ShopConfig.LimitedPack.initialQuantity
 local pendingLimitedQty = nil
 
 local shopFrame = menuGui:WaitForChild("Shop")
+local loadingFrame = shopFrame:WaitForChild("LoadingFrame")
 local topBar = shopFrame:WaitForChild("TopBar")
 local closeButton = topBar:WaitForChild("Frame"):WaitForChild("CloseButton")
 
@@ -61,11 +63,12 @@ local coinsGridFrame = coinsGrid:WaitForChild("GridFrame")
 local coinsRow1 = coinsGridFrame:WaitForChild("TilesRow1")
 local coinsRow2 = coinsGridFrame:WaitForChild("TilesRow2")
 
-local dailyGiftFrame = limitedPackFrame:WaitForChild("DailyGiftFrame")
+local dailyGiftFrame = scrollingBody:WaitForChild("DailyGiftFrame")
 local dailyGiftBoard = dailyGiftFrame:WaitForChild("StarterPackBoard")
 local dailyGiftBody = dailyGiftBoard:WaitForChild("Body")
 local dailyRedPoint = dailyGiftBoard:WaitForChild("RedPoint")
 local dailyClimeBtn = dailyGiftBody:WaitForChild("ClimeButton")
+local dailyClimedFrame = dailyGiftBody:WaitForChild("ClaimedFrame")
 local dailyPriceFrame = dailyClimeBtn:WaitForChild("Price")
 local dailyClaimText = dailyPriceFrame:WaitForChild("PriceLabel")
 local dailyUnavailable = dailyClimeBtn:WaitForChild("Unavailable")
@@ -99,6 +102,10 @@ local function _formatTime(seconds)
 end
 
 function ShopController.Init()
+	local loadingDisplay = LoadingDisplay()
+	loadingDisplay.Parent = loadingFrame
+	loadingFrame.Visible = true
+	
 	ShopController._fetchProductPrices()
 
 	starterPriceLabel.Text = tostring(ShopConfig.StarterPack.discountPrice)
@@ -126,6 +133,7 @@ function ShopController.Init()
 		if not purchaseButton then
 			continue
 		end
+		
 		if RunService:IsStudio() then
 			purchaseButton.Activated:Connect(function()
 				Remotes.DevGamePassPurchase:FireServer(passConfig.productId)
@@ -148,18 +156,19 @@ function ShopController.Init()
 			MarketplaceService:PromptProductPurchase(player, coinConfig.productId)
 		end)
 	end
-
+	
 	ShopController._startStarterTimer()
 	ShopController._initDailyGift()
 	ShopController._initLimitedQtySync()
 	ShopController._initBoostSync()
 	ShopController.Refresh()
+	loadingFrame.Visible = false
 end
 
 function ShopController._fetchProductPrices()
 	for _, coinConfig in ipairs(ShopConfig.Coins) do
 		local success, info = pcall(function()
-			return MarketplaceService:GetProductInfo(coinConfig.productId, Enum.InfoType.Product)
+			return MarketplaceService:GetProductInfoAsync(coinConfig.productId, Enum.InfoType.Product)
 		end)
 		if success and info and info.PriceInRobux then
 			local row = coinConfig.row == 1 and coinsRow1 or coinsRow2
@@ -173,7 +182,7 @@ function ShopController._fetchProductPrices()
 
 	for _, passConfig in pairs(ShopConfig.GamePasses) do
 		local success, info = pcall(function()
-			return MarketplaceService:GetProductInfo(passConfig.productId, Enum.InfoType.GamePass)
+			return MarketplaceService:GetProductInfoAsync(passConfig.productId, Enum.InfoType.GamePass)
 		end)
 		if success and info and info.PriceInRobux then
 			local frame = ShopController._getPassFrame(passConfig.perkId)
@@ -187,14 +196,14 @@ function ShopController._fetchProductPrices()
 	end
 
 	local success, info = pcall(function()
-		return MarketplaceService:GetProductInfo(ShopConfig.StarterPack.productId, Enum.InfoType.Product)
+		return MarketplaceService:GetProductInfoAsync(ShopConfig.StarterPack.productId, Enum.InfoType.Product)
 	end)
 	if success and info and info.PriceInRobux then
 		starterPriceLabel.Text = tostring(info.PriceInRobux)
 	end
 
 	local success, info = pcall(function()
-		return MarketplaceService:GetProductInfo(ShopConfig.LimitedPack.productId, Enum.InfoType.Product)
+		return MarketplaceService:GetProductInfoAsync(ShopConfig.LimitedPack.productId, Enum.InfoType.Product)
 	end)
 	if success and info and info.PriceInRobux then
 		limitedPriceLabel.Text = tostring(info.PriceInRobux)
@@ -238,7 +247,8 @@ function ShopController._startStarterTimer()
 				starterOldPriceFrame.Visible = false
 				return
 			end
-
+			
+			print(remaining)
 			starterTimer.Text = _formatTime(remaining)
 			task.wait(1)
 		end
@@ -285,6 +295,7 @@ function ShopController._initDailyGift()
 	Remotes.ShopDailyGiftState.OnClientEvent:Connect(function(isAvailable, nextAvailable)
 		dailyUnavailable.Visible = not isAvailable
 		dailyClimeBtn.Visible = isAvailable
+		dailyClimedFrame.Visible = not isAvailable
 		dailyRedPoint.Visible = isAvailable
 		shopButtonRedPoint.Visible = isAvailable
 		if not isAvailable then
@@ -300,15 +311,15 @@ function ShopController.Refresh()
 	local donateUpgrades = PlayerDataClient.get("donateUpgrades") or {}
 
 	for _, passConfig in pairs(ShopConfig.GamePasses) do
-		local frame = ShopController._getPassFrame(passConfig.perkId)
-		if frame then
-			local owned = donateUpgrades[passConfig.perkId] == true
-			if owned then
-				frame.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
-			else
-				frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-			end
-		end
+		local tile = ShopController._getPassFrame(passConfig.perkId)
+		local tileInfo = tile:WaitForChild("Info")
+		local purchaseButton = tileInfo:WaitForChild("PurchaseButton")
+		local claimedLabel = tileInfo:WaitForChild("ClaimedLabel")
+		
+		local owned = donateUpgrades[passConfig.perkId] == true
+		
+		claimedLabel.Visible = owned
+		purchaseButton.Visible = not owned
 	end
 end
 

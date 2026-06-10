@@ -37,6 +37,7 @@ function RollService.Roll(player)
 	PlayerService.WaitForLoad(player)
 
 	local donateUpgrades = PlayerService.GetValue(player, "donateUpgrades") or {}
+	
 	local timeNow = os.time()
 	local clockNow = os.clock()
 	local luckBoostExpiry = PlayerService.GetValue(player, "luckBoostExpiry") or 0
@@ -51,7 +52,7 @@ function RollService.Roll(player)
 	if donateUpgrades.fastRoll then
 		cooldown = cooldown / 2
 	end
-
+	
 	if lastRollTime[player.UserId] and (clockNow - lastRollTime[player.UserId]) < cooldown then
 		return
 	end
@@ -70,6 +71,7 @@ function RollService.Roll(player)
 		effectiveLuck = 1000000000
 	end
 
+	print(effectiveLuck)
 	local petType, petData
 	if _isTutorialRoll(player) then
 		local dice = PlayerService.GetValue(player, "dice") or 0
@@ -83,7 +85,7 @@ function RollService.Roll(player)
 	else
 		petType, petData = RarityCalculator.Roll(effectiveLuck)
 	end
-	
+
 	local petCountNum = TableUtils.objLength(PlayerService.GetValue(player, "pets") or {})
 
 	local petId = string.format("%s_%d", petType, petCountNum + 1)
@@ -109,9 +111,9 @@ function RollService.Roll(player)
 	if donateUpgrades.extraSlot then
 		maxSlots = maxSlots + 1
 	end
-	
+
 	local autoEquipped = false
-	
+
 	if #equipped < maxSlots then
 		autoEquipped = true
 		PlayerService.UpdateValue(player, "equippedPets", function(list)
